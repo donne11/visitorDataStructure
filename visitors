@@ -1,0 +1,361 @@
+import tester.Tester;
+import java.util.function.Function;
+import java.util.function.BiFunction;
+
+// interface for a visitor 
+interface IListVisitor<R, U> {
+
+  // In interface IListVisitor : visitMtList
+  // visitor for a empty list
+  U visitMtList(MtList<R> empty);
+
+  // In interface IListVisitor : visitConsList
+  // visitor for a cons list
+  U visitConsList(ConsList<R> cons);
+
+}
+
+//represents a generic list
+interface IList<T> {
+
+  // In interface IList : accept
+  // takes a visitor
+  <U> U accept(IListVisitor<T, U> visitor);
+}
+
+//represents an ancestry tree
+interface IAT {
+
+  // In interface IAT : accept
+  // takes a visitor
+  <R> R accept(IATVisitor<R> visit);
+}
+
+//represents a visitor of IAT
+interface IATVisitor<T> {
+  // In interface IATVisitor
+  // used on unknown class
+  T visitUnknown(Unknown uk);
+
+  // In interface IATVisitor
+  // used on person class
+  T visitPerson(Person p);
+}
+
+// a class to represent map a list
+class MapVisitor<A, R> implements IListVisitor<A, IList<R>> {
+
+  Function<A, R> func1;
+
+  MapVisitor(Function<A, R> func1) {
+    this.func1 = func1;
+  }
+
+  // In Class MapVisitor : visitMtList
+  // maps the empty list
+  public IList<R> visitMtList(MtList<A> empty) {
+    return new MtList<R>();
+  }
+
+  // In Class MapVisitor : visitConsList
+  // maps the entire list
+  public IList<R> visitConsList(ConsList<A> cons) {
+    return new ConsList<R>(func1.apply(cons.first), cons.rest.accept(this));
+  }
+}
+
+// a class to combine list give a function
+class FoldRVisitor<T, U> implements IListVisitor<T, U> {
+
+  BiFunction<T, U, U> func2;
+  U base;
+
+  FoldRVisitor(BiFunction<T, U, U> func2, U base) {
+    this.func2 = func2;
+    this.base = base;
+  }
+
+  // In Class FoldRVisitor : visitMtList
+  // visits the empty list
+  public U visitMtList(MtList<T> empty) {
+    return base;
+  }
+
+  // In Class FoldrVisitor : visitConsList
+  // visits consList to combines everything
+  public U visitConsList(ConsList<T> cons) {
+    return func2.apply(cons.first, cons.rest.accept(this));
+  }
+}
+
+// a class to append two lists 
+class AppendVisitor<R> implements IListVisitor<R, IList<R>> {
+
+  IList<R> list;
+
+  AppendVisitor(IList<R> list) {
+    this.list = list;
+  }
+
+  public IList<R> visitMtList(MtList<R> empty) {
+    return this.list;
+  }
+
+  public IList<R> visitConsList(ConsList<R> cons) {
+    return new ConsList<R>(cons.first, cons.rest.accept(this));
+  }
+}
+
+// a class to get the names of the visitors 
+class NamesVisitor implements IATVisitor<IList<String>> {
+
+  // In Class NamesVisitor : visitUnknown
+  // create an empty list for unknown name
+  public IList<String> visitUnknown(Unknown uk) {
+    return new MtList<String>();
+  }
+
+  // In Class NamesVisitor : visitPerson
+  // get all the peoples names inn the
+  public IList<String> visitPerson(Person p) {
+    return appendNames(p.name, p.parent1.accept(this), p.parent2.accept(this));
+  }
+
+  // Helper method to append names to an IList
+  IList<String> appendNames(String name, IList<String> parent1Names, IList<String> parent2Names) {
+    return new ConsList<String>(name, append(parent1Names, parent2Names));
+  }
+
+  // Helper method to append two ILists together
+  IList<String> append(IList<String> list1, IList<String> list2) {
+    return list1.accept(new AppendVisitor<>(list2));
+  }
+}
+
+//represents an empty generic list
+class MtList<T> implements IList<T> {
+
+  // In Class MtList : accept
+  // visitor method to enter into the empty list
+  public <U> U accept(IListVisitor<T, U> visitor) {
+    return visitor.visitMtList(this);
+  }
+}
+
+//represents a generic non-empty list
+class ConsList<T> implements IList<T> {
+  T first;
+  IList<T> rest;
+
+  ConsList(T first, IList<T> rest) {
+    this.first = first;
+    this.rest = rest;
+  }
+
+  // In Class ConsList : accept
+  // visitor to enter into a list of cons
+  public <U> U accept(IListVisitor<T, U> visitor) {
+    return visitor.visitConsList(this);
+  }
+}
+
+//represents an unknown ancestor tree
+class Unknown implements IAT {
+  Unknown() {
+  }
+
+  // In Class Unknown : accept
+  // accepts a visitor for this Unknown
+  public <R> R accept(IATVisitor<R> vis) {
+    return vis.visitUnknown(this);
+  }
+}
+
+//represents a person in an ancestry tree
+class Person implements IAT {
+  String name;
+  int yob;
+  IAT parent1;
+  IAT parent2;
+
+  Person(String name, int yob, IAT parent1, IAT parent2) {
+    this.name = name;
+    this.yob = yob;
+    this.parent1 = parent1;
+    this.parent2 = parent2;
+  }
+
+  // In Class Person : accept
+  // visitor to accept the given object
+  public <R> R accept(IATVisitor<R> visitor) {
+    return visitor.visitPerson(this);
+  }
+}
+
+// a class to represent examples and tests 
+class ExamplesLists {
+
+  IAT unknow = new Unknown();
+  IAT Anne = new Person("Anne", 1234, this.unknow, this.unknow);
+  IAT Bob = new Person("Bob", 1232, this.unknow, this.unknow);
+  IAT Dana = new Person("Dana", 1265, this.Anne, this.Bob);
+
+  IList<String> mtStr = new MtList<String>();
+  IList<Integer> emptyList = new MtList<Integer>();
+  IList<String> strings = new ConsList<String>("a", new ConsList<String>("bb", this.mtStr));
+  IList<Integer> ints3 = new ConsList<>(1, new ConsList<>(2, new ConsList<>(3, new MtList<>())));
+  IList<Integer> ints10 = new ConsList<>(11,
+      new ConsList<>(12, new ConsList<>(13, new MtList<>())));
+  IList<Integer> negativeInts = new ConsList<>(-1,
+      new ConsList<>(-5, new ConsList<>(-7, new MtList<>())));
+  IList<Integer> negativeIntsMapped = new ConsList<>(9,
+      new ConsList<>(5, new ConsList<>(3, new MtList<>())));
+  IList<String> list1 = new ConsList<>("A", new ConsList<>("B", new MtList<>()));
+  IList<String> list2 = new ConsList<>("C", new ConsList<>("D", new MtList<>()));
+  IList<String> expected = new ConsList<>("A",
+      new ConsList<>("B", new ConsList<>("C", new ConsList<>("D", new MtList<>()))));
+  IList<String> name = new ConsList<String>("Dana",
+      new ConsList<String>("Anne", new ConsList<String>("Bob", new MtList<String>())));
+  IList<Integer> intList1 = new ConsList<>(1, new ConsList<>(2, new ConsList<>(3, new MtList<>())));
+  IList<Integer> intList2 = new ConsList<>(4, new ConsList<>(5, new ConsList<>(6, new MtList<>())));
+  IList<Integer> expectedIntList = new ConsList<>(1, new ConsList<>(2,
+      new ConsList<>(3, new ConsList<>(4, new ConsList<>(5, new ConsList<>(6, new MtList<>()))))));
+
+  // test for testNamesVisitor
+  boolean testNamesVisitor(Tester t) {
+    return
+    // Test with an empty unknown ancestry tree
+    t.checkExpect(this.unknow.accept(new NamesVisitor()), new MtList<String>())
+        // test with one known person
+        && t.checkExpect(this.Anne.accept(new NamesVisitor()),
+            new ConsList<String>("Anne", new MtList<String>()))
+        // Test with multiple generations of ancestors
+        && t.checkExpect(this.Dana.accept(new NamesVisitor()), this.name)
+        // Test with a single person with unknown parents
+        && t.checkExpect(
+            new Person("John", 1985, this.unknow, this.unknow).accept(new NamesVisitor()),
+            new ConsList<String>("John", new MtList<String>()))
+        // Test with two people, one of them having unknown parents
+        && t.checkExpect(new Person("Lucy", 1999, this.unknow, this.Bob).accept(new NamesVisitor()),
+            new ConsList<String>("Lucy", new ConsList<String>("Bob", new MtList<String>())));
+  }
+
+  // Test for MapVisitor
+  boolean testMapVisitor(Tester t) {
+    // A function tto map 10 onto a list
+    Function<Integer, Integer> addTen = x -> x + 10;
+    // A function to append a suffix to each string in the list
+    Function<String, String> appendStringSuffix = str -> str + "Suffix";
+
+    return
+
+    // TEST ON LIST OF INTS
+
+    // test on positive integers
+    t.checkExpect(this.ints3.accept(new MapVisitor(addTen)), this.ints10)
+        // test on negative integers
+        && t.checkExpect(this.negativeInts.accept(new MapVisitor(addTen)), this.negativeIntsMapped)
+        // test on empty list
+        && t.checkExpect(this.emptyList.accept(new MapVisitor(addTen)), this.emptyList)
+
+        // TEST ON NEGATIVE INTEGERS
+        && t.checkExpect(this.ints3.accept(new MapVisitor(addTen)), this.ints10)
+        // Test on negative integers
+        && t.checkExpect(this.negativeInts.accept(new MapVisitor(addTen)), this.negativeIntsMapped)
+        // Test on empty integer list
+        && t.checkExpect(this.emptyList.accept(new MapVisitor(addTen)), this.emptyList)
+        // Test on a list of strings
+        && t.checkExpect(this.strings.accept(new MapVisitor(appendStringSuffix)),
+            new ConsList<>("aSuffix", new ConsList<>("bbSuffix", this.mtStr)))
+        
+        // TEST ON LIST OF STRINGS 
+        
+        // Test on an empty list of strings
+        // Test on an empty list of strings
+        && t.checkExpect(this.mtStr.accept(new MapVisitor(appendStringSuffix)), this.mtStr) 
+        
+        // Test on a list with a single empty string
+        && t.checkExpect(new ConsList<>("", this.mtStr).accept(new MapVisitor(appendStringSuffix)),
+            new ConsList<>("Suffix", this.mtStr)) 
+        
+        // Test on a list with multiple empty strings
+        && t.checkExpect(new ConsList<>("", new ConsList<>("", new ConsList<>("", this.mtStr)))
+            .accept(new MapVisitor(appendStringSuffix)),
+            new ConsList<>("Suffix", new ConsList<>("Suffix", 
+                new ConsList<>("Suffix", this.mtStr)))) 
+        
+        // Test on a list with strings of different lengths
+        && t.checkExpect(new ConsList<>("Hello", new ConsList<>("World", 
+            new ConsList<>("!", this.mtStr)))
+            .accept(new MapVisitor(appendStringSuffix)),
+            new ConsList<>("HelloSuffix", new ConsList<>("WorldSuffix",
+                new ConsList("!Suffix", this.mtStr)))) 
+        
+        // Test on a list with spaces
+        && t.checkExpect(new ConsList<>("Space ", new ConsList("in between", 
+            new ConsList(" words", this.mtStr)))
+            .accept(new MapVisitor(appendStringSuffix)),
+            new ConsList<>("Space Suffix", new ConsList("in betweenSuffix", 
+                new ConsList(" wordsSuffix", this.mtStr))));
+  }
+
+  // Test for FoldRVisitor
+  boolean testFoldRVisitor(Tester t) {
+    // Define a folding function to sum the integers
+    BiFunction<Integer, Integer, Integer> sumFunction = (x, acc) -> x + acc;
+    // Defining a folding function for strings
+    BiFunction<String, String, String> concatFunction = (str, acc) -> str + acc;
+    return
+
+    // TEST ON LIST OF INTS
+
+    // test on positive ints
+    t.checkExpect(ints3.accept(new FoldRVisitor<>(sumFunction, 0)), 6)
+        // test on negative ints
+        && t.checkExpect(this.negativeInts.accept(new FoldRVisitor<>(sumFunction, 0)), -13)
+        // test on empty list
+        && t.checkExpect(this.emptyList.accept(new FoldRVisitor<>(sumFunction, 0)), 0)
+
+        // TEST ON LIST OF STRINGS
+
+        // test on a list of strings
+        && t.checkExpect(this.strings.accept(new FoldRVisitor<>(concatFunction, "")), "abb")
+        // test on a list of strings/ w strings
+        && t.checkExpect(this.list1.accept(new FoldRVisitor<>(concatFunction, "CD")), "ABCD")
+        // test on an empty list of strings
+        && t.checkExpect(this.mtStr.accept(new FoldRVisitor<>(concatFunction, "")), "");
+
+  }
+
+  // Test for AppendVisitor
+  boolean testAppendVisitor(Tester t) {
+    return
+
+    // TEST ON LIST OF STRINGS
+
+    // test on two empty strings
+    t.checkExpect(this.mtStr.accept(new AppendVisitor<>(this.mtStr)), this.mtStr)
+        // test on one empty string and one list
+        && t.checkExpect(this.mtStr.accept(new AppendVisitor<>(this.list1)), this.list1)
+        // test on one empty string an one list (reverse)
+        && t.checkExpect(this.list2.accept(new AppendVisitor<>(this.mtStr)), this.list2)
+        // test on two lists
+        && t.checkExpect(this.list1.accept(new AppendVisitor<>(this.list2)), this.expected)
+        // test on two lists (reverse order)
+        && t.checkExpect(this.list2.accept(new AppendVisitor<>(this.list1)), new ConsList<>("C",
+            new ConsList<>("D", new ConsList<>("A", new ConsList<>("B", new MtList<>())))))
+
+        // TEST ON LIST OF INTS
+
+        // test on empty list of ints
+        && t.checkExpect(this.emptyList.accept(new AppendVisitor<>(this.emptyList)), 
+            new MtList<Integer>())
+        // test on one empty and one non empty
+        && t.checkExpect(this.intList1.accept(new AppendVisitor<>(new MtList<Integer>())),
+            this.intList1)
+        // test on two list of ints
+        && t.checkExpect(this.intList1.accept(new AppendVisitor<>(this.intList2)),
+            this.expectedIntList);
+  }
+
+}
